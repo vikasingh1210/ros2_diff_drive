@@ -1,0 +1,21 @@
+# ROS2 (for when we add Pi files)
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Arduino / PlatformIO
+arduino/.pio/
+arduino/*.hex
+arduino/*.elf
+
+# Python (if any utilities)
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
