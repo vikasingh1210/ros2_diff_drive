@@ -1,0 +1,11 @@
+<package format="3">
+  <name>my_bringup</name>
+  <version>0.0.1</version>
+  <description>Bringup for Pi5</description>
+  <maintainer email="ed@example.com">ed</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>demo_nodes_cpp</exec_depend>
+  <exec_depend>demo_nodes_py</exec_depend>
+</package>
