@@ -1,65 +1,56 @@
 #pragma once
 #include <Arduino.h>
-#include <PinChangeInterrupt.h>
 
-// Encoders: A on D2/D3 (INT0/INT1), B on any PCINT (e.g., D4, D12)
+// Quadrature encoder reader for Arduino UNO using external interrupts on pin A.
+// Works best when pinA is 2 or 3 (INT0/INT1). pinB can be any digital pin.
+// Counts +/- 1 per A transition (x2 decoding). Direction is derived from B.
 class EncoderUNO {
 public:
-  EncoderUNO(uint8_t pinA, uint8_t pinB, bool invert=false)
-  : pinA_(pinA), pinB_(pinB), invert_(invert) {}
+  EncoderUNO(uint8_t pinA, uint8_t pinB)
+  : _pinA(pinA), _pinB(pinB) {}
 
   void begin() {
-    pinMode(pinA_, INPUT_PULLUP);
-    pinMode(pinB_, INPUT_PULLUP);
-
-    if (!slot0_) slot0_ = this;
-    else if (!slot1_) slot1_ = this;
-
-    if (pinA_ == 2)      attachInterrupt(digitalPinToInterrupt(2), isrA_2, CHANGE);
-    else if (pinA_ == 3) attachInterrupt(digitalPinToInterrupt(3), isrA_3, CHANGE);
-    else                 attachPCINT(digitalPinToPCINT(pinA_), isrA_PCINT, CHANGE);
-
-    if (this == slot0_) attachPCINT(digitalPinToPCINT(pinB_), isrB_0, CHANGE);
-    else                attachPCINT(digitalPinToPCINT(pinB_), isrB_1, CHANGE);
+    pinMode(_pinA, INPUT_PULLUP);
+    pinMode(_pinB, INPUT_PULLUP);
+    noInterrupts();
+    if (!_inst0) { _inst0 = this; attachInterrupt(digitalPinToInterrupt(_pinA), _isr0, CHANGE); }
+    else if (!_inst1) { _inst1 = this; attachInterrupt(digitalPinToInterrupt(_pinA), _isr1, CHANGE); }
+    interrupts();
   }
 
-  inline long ticks() const { noInterrupts(); long t = ticks_; interrupts(); return t; }
-  inline void reset()       { noInterrupts(); ticks_ = 0;    interrupts(); }
+  inline long ticks() const {
+    noInterrupts();
+    long t = _ticks;
+    interrupts();
+    return t;
+  }
 
-  float rpmFromDelta(long dTicks, float dt, long ticks_per_rev) const {
-    return (float)dTicks * (60.0f / (ticks_per_rev * dt));
+  inline void reset() {
+    noInterrupts();
+    _ticks = 0;
+    interrupts();
   }
 
 private:
-  volatile long ticks_ = 0;
-  uint8_t pinA_, pinB_; bool invert_;
+  volatile long _ticks = 0;
+  uint8_t _pinA, _pinB;
 
-  inline void edgeA() {
-    bool A = digitalRead(pinA_), B = digitalRead(pinB_);
-    int dir = (A == B) ? +1 : -1;
-    if (invert_) dir = -dir;
-    ticks_ += dir;
-  }
-  inline void edgeB() {
-    bool A = digitalRead(pinA_), B = digitalRead(pinB_);
-    int dir = (A != B) ? +1 : -1;
-    if (invert_) dir = -dir;
-    ticks_ += dir;
+  void _handle() {
+    // Read both channels and decide direction.
+    // On A transition: if A == B → -1 else +1 (CW/CCW depends on wiring).
+    int a = digitalRead(_pinA);
+    int b = digitalRead(_pinB);
+    int8_t dir = (a == b) ? -1 : +1;
+    _ticks += dir;
   }
 
-  static EncoderUNO* slotForPinA(uint8_t pin) {
-    if (slot0_ && slot0_->pinA_ == pin) return slot0_;
-    if (slot1_ && slot1_->pinA_ == pin) return slot1_;
-    return nullptr;
-  }
-  static EncoderUNO* slot0_; static EncoderUNO* slot1_;
+  static EncoderUNO* _inst0;
+  static EncoderUNO* _inst1;
 
-  static void isrA_2() { if (auto s = slotForPinA(2)) s->edgeA(); }
-  static void isrA_3() { if (auto s = slotForPinA(3)) s->edgeA(); }
-  static void isrA_PCINT() { if (slot0_) slot0_->edgeA(); if (slot1_) slot1_->edgeA(); }
-  static void isrB_0() { if (slot0_) slot0_->edgeB(); }
-  static void isrB_1() { if (slot1_) slot1_->edgeB(); }
+  static void _isr0() { if (_inst0) _inst0->_handle(); }
+  static void _isr1() { if (_inst1) _inst1->_handle(); }
 };
 
-inline EncoderUNO* EncoderUNO::slot0_ = nullptr;
-inline EncoderUNO* EncoderUNO::slot1_ = nullptr;
+// static storage
+EncoderUNO* EncoderUNO::_inst0 = nullptr;
+EncoderUNO* EncoderUNO::_inst1 = nullptr;

@@ -1,25 +1,40 @@
 #pragma once
 #include <Arduino.h>
 
-// In : "SPD:<leftRPM> <rightRPM>\n"  or "STOP\n"
-// Out: "TCK:<leftTicks> <rightTicks>\n"
-
 struct SpeedCmd {
-  long rpm_l;
-  long rpm_r;
-  SpeedCmd() : rpm_l(0), rpm_r(0) {}
-  SpeedCmd(long L, long R) : rpm_l(L), rpm_r(R) {}
+  int16_t rpm_l = 0;
+  int16_t rpm_r = 0;
 };
 
-inline bool parseSpeedLine(const String& s, SpeedCmd& out) {
-  if (!s.startsWith("SPD:")) return false;
-  int sp = s.indexOf(' ');
+// Parse "SPD:<L> <R>" (case-insensitive). Returns true if parsed.
+inline bool parseSpeedLine(const String& line, SpeedCmd& out) {
+  out = {};
+  if (line.length() < 5) return false;
+
+  // Case-insensitive startsWith for "SPD:"
+  bool ok = false;
+  if (line.startsWith("SPD:") || line.startsWith("spd:") ||
+      line.startsWith("Spd:") || line.startsWith("SpD:")) {
+    ok = true;
+  }
+  if (!ok) return false;
+
+  int sep = line.indexOf(':');
+  if (sep < 0) return false;
+  String rest = line.substring(sep + 1);
+  rest.trim();
+
+  int sp = rest.indexOf(' ');
   if (sp < 0) return false;
-  out.rpm_l = s.substring(4, sp).toInt();
-  out.rpm_r = s.substring(sp + 1).toInt();
+
+  out.rpm_l = (int16_t)rest.substring(0, sp).toInt();
+
+  String r = rest.substring(sp + 1);
+  r.trim();
+  out.rpm_r = (int16_t)r.toInt();
   return true;
 }
 
-inline void printTicks(Stream& io, long tl, long tr) {
-  io.print("TCK:"); io.print(tl); io.print(" "); io.println(tr);
+inline void printTicks(Stream& s, long tL, long tR) {
+  s.print("TCK:"); s.print(tL); s.print(' '); s.println(tR);
 }

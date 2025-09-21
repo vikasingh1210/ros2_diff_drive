@@ -1,38 +1,61 @@
 #pragma once
 #include <Arduino.h>
 
-// L298 with enable pins tied HIGH; drive via IN1/IN2 pairs.
-// We PWM one leg and drive the other LOW/HIGH to set direction.
+// Minimal L298 2-pin driver (sign-magnitude).
+// Use two PWM-capable pins (e.g., 5/6, 9/10 on UNO).
+// If pwmOnIn1=true: IN1 gets PWM for forward, IN2 LOW; reverse = IN2 gets PWM, IN1 LOW.
 class L298 {
 public:
-  L298(uint8_t in1, uint8_t in2, bool pwmOnIn1 = true, uint8_t pwmMax = 255)
-  : in1_(in1), in2_(in2), pwmOnIn1_(pwmOnIn1), pwmMax_(pwmMax) {}
+  L298(uint8_t in1, uint8_t in2, bool pwmOnIn1 = true, uint8_t maxPwm = 255)
+  : _in1(in1), _in2(in2), _pwmOnIn1(pwmOnIn1), _max(maxPwm) {}
 
   void begin() {
-    pinMode(in1_, OUTPUT);
-    pinMode(in2_, OUTPUT);
+    pinMode(_in1, OUTPUT);
+    pinMode(_in2, OUTPUT);
     stop();
   }
 
-  // pwm: -255..+255
-  void drive(int16_t pwm) {
-    pwm = constrain(pwm, -(int)pwmMax_, (int)pwmMax_);
-    uint8_t duty = (uint8_t)abs(pwm);
+  inline void stop() {
+    analogWrite(_in1, 0);
+    analogWrite(_in2, 0);
+    digitalWrite(_in1, LOW);
+    digitalWrite(_in2, LOW);
+  }
 
-    if (pwm > 0) {
-      if (pwmOnIn1_) { analogWrite(in1_, duty); digitalWrite(in2_, LOW);  }
-      else           { digitalWrite(in1_, HIGH); analogWrite(in2_, 255 - duty); }
-    } else if (pwm < 0) {
-      if (pwmOnIn1_) { digitalWrite(in1_, LOW);  analogWrite(in2_, duty); }
-      else           { analogWrite(in1_, 255 - duty); digitalWrite(in2_, HIGH); }
+  // Signed PWM: -255..+255
+  void drive(int16_t pwm) {
+    if (pwm == 0) { stop(); return; }
+    int s = (pwm > 0) ? 1 : -1;
+    int mag = abs(pwm);
+    if (mag > _max) mag = _max;
+
+    if (s > 0) {
+      // forward
+      if (_pwmOnIn1) {
+        analogWrite(_in1, mag);
+        analogWrite(_in2, 0);
+        digitalWrite(_in2, LOW);
+      } else {
+        analogWrite(_in2, 0);
+        digitalWrite(_in2, LOW);
+        analogWrite(_in1, mag);
+      }
     } else {
-      brakeFast();
+      // reverse
+      if (_pwmOnIn1) {
+        analogWrite(_in1, 0);
+        digitalWrite(_in1, LOW);
+        analogWrite(_in2, mag);
+      } else {
+        analogWrite(_in2, mag);
+        analogWrite(_in1, 0);
+        digitalWrite(_in1, LOW);
+      }
     }
   }
 
-  void stop()      { analogWrite(in1_, 0); analogWrite(in2_, 0); }
-  void brakeFast() { digitalWrite(in1_, HIGH); digitalWrite(in2_, HIGH); }
-
 private:
-  uint8_t in1_, in2_; bool pwmOnIn1_; uint8_t pwmMax_;
+  uint8_t _in1, _in2;
+  bool    _pwmOnIn1;
+  uint8_t _max;
 };
