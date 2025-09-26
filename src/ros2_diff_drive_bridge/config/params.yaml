@@ -1,0 +1,18 @@
+ros2_diff_drive_bridge:
+  ros__parameters:
+    port: "/dev/ttyACM0"     # fallback to "/dev/ttyACM0" if udev symlink not present
+    baud: 115200
+
+    wheel_radius: 0.0325
+    wheel_track:  0.19
+
+    control_hz: 20
+    rpm_limit: 250.0
+    timeout_sec: 0.6
+
+    kp: 1.1
+    ki: 0.25
+    trim_left: 1.00
+    trim_right: 1.00
+
+    ff_k: 0.0
